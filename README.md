@@ -1,70 +1,79 @@
-# MediaTool
+# MediaTool 项目集合
 
-Electron + Vite + React + Ant Design + FFmpeg sample project.
+这是一个包含多个独立 Electron 应用的项目集合。
 
-Quick start:
+## 项目列表
+
+### 1. media-tool-app
+
+视频音频处理工具，支持：
+- 音频提取与静音
+- 字幕识别（Whisper）
+- 基于 FFmpeg 的媒体处理
+
+[查看详细文档](./media-tool-app/README.md)
 
 ```bash
-cd D:/MediaTool
+cd media-tool-app
 npm install
 npm run dev:electron
 ```
 
-Notes:
-- This project uses `ffmpeg-static` and `fluent-ffmpeg` in the main process.
-- Renderer is served by Vite during development; Electron loads the dev server.
+### 2. ai-app
 
-## 字幕识别（Whisper）
+基于第三方大模型 API 的 AI 助手应用，支持：
+- OpenAI API
+- Claude API
+- 通义千问
+- 文心一言
+- 其他兼容 OpenAI 格式的 API
 
-本项目的“识别字幕”优先使用项目内置的 `whisper.cpp`（类似 `ffmpeg-static`：应用自带可执行文件），找不到才会回退到系统环境里的 `whisper` / `python -m whisper`。
+[查看详细文档](./ai-app/README.md)
 
-### 自动拉取（npm install 后自动下载）
-
-默认在 `npm install` 后会自动下载：
-
-- whisper.cpp Windows 预编译包（来自 GitHub Releases，默认 tag：`v1.8.2`）
-- 默认模型（来自 HuggingFace：`ggml-base.bin`）
-
-下载目标目录：`src/main/vendor/whisper/`（已加入 `.gitignore`，避免把大文件提交进仓库）
-
-可用环境变量：
-
-- `MEDIATOOL_SKIP_WHISPER_DOWNLOAD=1`：完全跳过自动下载
-- `WHISPER_CPP_SKIP_MODEL=1`：只下载二进制，不下载模型
-- `MEDIATOOL_WHISPER_STRICT=1`：下载失败时让 `npm install` 直接失败（默认是警告并继续）
-- `WHISPER_CPP_TAG=v1.8.2`：指定 whisper.cpp release tag
-- `WHISPER_CPP_ASSET_URL=...zip`：直接指定要下载的 whisper.cpp zip（覆盖自动选择）
-- `WHISPER_CPP_MODEL_NAME=ggml-base.bin`：指定模型文件名
-- `WHISPER_CPP_MODEL_URL=...bin`：直接指定模型下载 URL
-
-### 方案 A：把 whisper.cpp 放进项目（推荐）
-
-1) 准备 whisper.cpp 可执行文件（Windows 通常是 `whisper.exe`）
-
-2) 准备模型文件（例如 `ggml-base.bin` / `ggml-small.bin`）
-
-3) 放到以下目录（自行创建）：
-
-- `src/main/vendor/whisper/whisper.exe`
-- `src/main/vendor/whisper/models/ggml-base.bin`（或其他 .bin 模型）
-
-然后直接运行 `npm run dev:electron` 即可。
-
-### 方案 B：用环境变量指定路径（不改项目目录结构）
-
-在启动 Electron 之前设置：
-
-- `WHISPER_CPP_BIN`：whisper.cpp 可执行文件路径
-- `WHISPER_CPP_MODEL`：模型 .bin 文件路径
-
-示例（PowerShell）：
-
-```powershell
-$env:WHISPER_CPP_BIN = "D:\tools\whisper.cpp\whisper.exe"
-$env:WHISPER_CPP_MODEL = "D:\tools\whisper.cpp\models\ggml-base.bin"
+```bash
+cd ai-app
+npm install
 npm run dev:electron
 ```
 
-### 回退：使用系统 whisper（Python）
+## 技术栈
 
-如果你更想用 Python 版本：确保命令行里能运行 `whisper --help` 或 `python -m whisper --help`。
+两个项目都基于以下技术：
+- **Electron** - 跨平台桌面应用框架
+- **React** - 用户界面库
+- **Vite** - 快速的前端构建工具
+- **Ant Design** - UI 组件库
+
+## 开发说明
+
+每个子项目都是独立的，拥有自己的：
+- `package.json` - 依赖管理
+- `vite.config.ts` - Vite 配置
+- `src/` - 源代码目录
+
+## 项目结构
+
+```
+MediaTool/
+├── media-tool-app/      # 媒体工具应用
+│   ├── src/
+│   │   ├── main/       # Electron 主进程
+│   │   └── renderer/   # React 渲染进程
+│   ├── package.json
+│   └── README.md
+│
+├── ai-app/             # AI 助手应用
+│   ├── src/
+│   │   ├── main/       # Electron 主进程
+│   │   └── renderer/   # React 渲染进程
+│   ├── package.json
+│   └── README.md
+│
+└── README.md           # 本文件
+```
+
+## 注意事项
+
+- 每个项目需要单独安装依赖
+- 开发时注意端口配置（media-tool-app: 5173, ai-app: 5174）
+- 生产环境构建时需要分别构建每个项目
