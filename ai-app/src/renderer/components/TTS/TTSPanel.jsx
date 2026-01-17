@@ -13,6 +13,7 @@ import {
   Select,
   Row,
   Col,
+  Slider,
 } from "antd";
 import {
   SoundOutlined,
@@ -38,12 +39,44 @@ function TTSPanel() {
   const [loading, setLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState("");
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
+  const [volume, setVolume] = useState(50);
+  const [speed, setSpeed] = useState(1);
+
+  // 监听模型切换，重置音色选择
+  useEffect(() => {
+    setVoice(null);
+    setAudioUrl("");
+    loadVoices()
+  }, [model]);
+
+   const loadVoices = async () => {
+      setLoading(true);
+      try {
+        const { queryVoiceList } = await import('../../services/tts');
+        const result = await queryVoiceList(model);
+        
+        if (result.success && result.voices) {
+          setVoice(result.voices[0] || null);
+        } else {
+          message.error('加载音色列表失败: ' + (result.error || '未知错误'));
+        }
+      } catch (error) {
+        message.error('加载音色列表失败: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
   const handleVoiceSelect = (selectedVoice) => {
     setVoice(selectedVoice);
     message.success(
       `已选择音色: ${selectedVoice.chineseName || selectedVoice.name}`
     );
+  };
+  
+  const handleModelChange = (newModel) => {
+    setModel(newModel);
+    message.info(`已切换到 ${getTTSModels().find(m => m.value === newModel)?.label}`);
   };
 
   const handleSynthesize = async () => {
@@ -67,11 +100,18 @@ function TTSPanel() {
     setAudioUrl("");
 
     try {
-      const voiceId = voice.voice || voice.name;
+      // 使用 voice 字段作为 API 调用的音色 ID
+      const voiceId = voice.voice;
       console.log('选中的音色对象:', voice);
       console.log('使用的音色ID:', voiceId);
       
-      const result = await synthesizeSpeech(text, model, voiceId);
+      // 如果是cosyvoice模型，传递音量和语速参数
+      const params = model.startsWith('cosyvoice') ? {
+        volume,
+        speed
+      } : {};
+      
+      const result = await synthesizeSpeech(text, model, voiceId, params);
 
       if (result.success && result.audioUrl) {
         setAudioUrl(result.audioUrl);
@@ -97,6 +137,7 @@ function TTSPanel() {
   };
 
   const modelInfo = getTTSModels().find((m) => m.value === model);
+  
 
   return (
     <div className="tts-container">
@@ -203,13 +244,18 @@ function TTSPanel() {
                 </Text>
                 <Select
                   value={model}
-                  onChange={setModel}
+                  onChange={handleModelChange}
                   style={{ width: "100%" }}
                   options={getTTSModels().map((m) => ({
                     label: m.label,
                     value: m.value,
                   }))}
                 />
+                {modelInfo && (
+                  <Text type="secondary" style={{ fontSize: "12px", marginTop: "4px", display: "block" }}>
+                    {modelInfo.description}
+                  </Text>
+                )}
               </div>
 
               {/* 音色选择 */}
@@ -290,22 +336,45 @@ function TTSPanel() {
                 )}
               </div>
 
-              {/* 语言选择 */}
-              <div>
-                <Text strong style={{ display: "block", marginBottom: "8px" }}>
-                  语言
-                </Text>
-                <Select
-                  defaultValue="中文"
-                  style={{ width: "100%" }}
-                  options={[
-                    { label: "中文", value: "中文" },
-                    { label: "英文", value: "英文" },
-                    { label: "日语", value: "日语" },
-                    { label: "韩语", value: "韩语" },
-                  ]}
-                />
-              </div>
+              {/* CosyVoice 模型专属参数 */}
+              {model.startsWith('cosyvoice') && (
+                <>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <Text strong>音量</Text>
+                      <Text type="secondary">{volume}</Text>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={volume}
+                      onChange={setVolume}
+                      tooltip={{ formatter: (value) => `${value}` }}
+                    />
+                  </div>
+
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <Text strong>语速</Text>
+                      <Text type="secondary">{speed}</Text>
+                    </div>
+                    <Slider
+                      min={0.5}
+                      max={2}
+                      step={0.1}
+                      value={speed}
+                      onChange={setSpeed}
+                      tooltip={{ formatter: (value) => `${value}x` }}
+                      marks={{
+                        0.5: '0.5x',
+                        1: '1x',
+                        1.5: '1.5x',
+                        2: '2x'
+                      }}
+                    />
+                  </div>
+                </>
+              )}
 
               {/* 查看模型更多控制能力 */}
               <div style={{ marginTop: "16px" }}>

@@ -21,6 +21,18 @@ function VoiceSelectionModal({ visible, onCancel, onSelect, modelId }) {
   useEffect(() => {
     if (visible) {
       loadVoices();
+      // 重置所有过滤条件和选中状态
+      setSearchText('');
+      setSelectedAge('全部年龄');
+      setSelectedGender('全部性别');
+      setSelectedLanguage('全部语言');
+      setSelectedScene('全部场景');
+      setSelectedVoice(null);
+      // 停止播放
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setPlayingVoice(null);
     }
   }, [visible, modelId]);
 
@@ -80,6 +92,7 @@ function VoiceSelectionModal({ visible, onCancel, onSelect, modelId }) {
       if (result.success && result.voices) {
         setVoices(result.voices);
         setFilteredVoices(result.voices);
+        setSelectedVoice(result.voices[0] || null);
       } else {
         message.error('加载音色列表失败: ' + (result.error || '未知错误'));
       }
@@ -91,7 +104,8 @@ function VoiceSelectionModal({ visible, onCancel, onSelect, modelId }) {
   };
 
   const handlePlayPreview = (voice) => {
-    if (playingVoice === voice.name) {
+    const voiceKey = voice.voice || voice.name;
+    if (playingVoice === voiceKey) {
       // 暂停当前播放
       if (audioRef.current) {
         audioRef.current.pause();
@@ -120,7 +134,7 @@ function VoiceSelectionModal({ visible, onCancel, onSelect, modelId }) {
           setPlayingVoice(null);
         };
         
-        setPlayingVoice(voice.name);
+        setPlayingVoice(voiceKey);
       } else {
         message.warning('该音色暂无试听音频');
       }
@@ -147,13 +161,13 @@ function VoiceSelectionModal({ visible, onCancel, onSelect, modelId }) {
     onCancel();
   };
   
-  const toggleFavorite = (voiceName, e) => {
+  const toggleFavorite = (voiceKey, e) => {
     e.stopPropagation();
     setFavorites(prev => {
-      if (prev.includes(voiceName)) {
-        return prev.filter(v => v !== voiceName);
+      if (prev.includes(voiceKey)) {
+        return prev.filter(v => v !== voiceKey);
       } else {
-        return [...prev, voiceName];
+        return [...prev, voiceKey];
       }
     });
   };
@@ -172,7 +186,7 @@ function VoiceSelectionModal({ visible, onCancel, onSelect, modelId }) {
       title="选择音色"
       open={visible}
       onCancel={onCancel}
-      width={950}
+      width={1003}
       centered
       footer={
         <div style={{ textAlign: 'right' }}>
@@ -262,26 +276,28 @@ function VoiceSelectionModal({ visible, onCancel, onSelect, modelId }) {
         ) : (
           <div style={{ maxHeight: '400px', overflowY: 'auto', overflowX: 'hidden' }}>
             <Row gutter={[12, 12]}>
-              {filteredVoices.map((voice) => (
-                <Col xs={24} sm={12} md={8} lg={6} key={voice.name}>
+              {filteredVoices.map((voice) => {
+                const voiceKey = voice.voice || voice.name;
+                return (
+                <Col xs={24} sm={12} md={8} lg={6} key={voiceKey}>
                   <div
                     onClick={() => handleSelectVoice(voice)}
                     style={{
                       cursor: 'pointer',
-                      border: selectedVoice?.name === voice.name ? '2px solid #1890ff' : '1px solid #f0f0f0',
+                      border: (selectedVoice?.voice || selectedVoice?.name) === voiceKey ? '2px solid #1890ff' : '1px solid #f0f0f0',
                       borderRadius: '8px',
                       padding: '12px',
-                      background: selectedVoice?.name === voice.name ? '#e6f7ff' : '#fff',
+                      background: (selectedVoice?.voice || selectedVoice?.name) === voiceKey ? '#e6f7ff' : '#fff',
                       position: 'relative',
                       transition: 'all 0.3s',
                     }}
                     onMouseEnter={(e) => {
-                      if (selectedVoice?.name !== voice.name) {
+                      if ((selectedVoice?.voice || selectedVoice?.name) !== voiceKey) {
                         e.currentTarget.style.borderColor = '#d9d9d9';
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (selectedVoice?.name !== voice.name) {
+                      if ((selectedVoice?.voice || selectedVoice?.name) !== voiceKey) {
                         e.currentTarget.style.borderColor = '#f0f0f0';
                       }
                     }}
@@ -319,7 +335,7 @@ function VoiceSelectionModal({ visible, onCancel, onSelect, modelId }) {
                               zIndex: 1,
                             }}
                           >
-                            {playingVoice === voice.name ? (
+                            {playingVoice === voiceKey ? (
                               <PauseCircleOutlined style={{ color: '#fff', fontSize: '10px' }} />
                             ) : (
                               <PlayCircleOutlined style={{ color: '#fff', fontSize: '10px' }} />
@@ -349,10 +365,10 @@ function VoiceSelectionModal({ visible, onCancel, onSelect, modelId }) {
                         </div>
                       </div>
                       <div 
-                        onClick={(e) => toggleFavorite(voice.name, e)}
+                        onClick={(e) => toggleFavorite(voiceKey, e)}
                         style={{ cursor: 'pointer', fontSize: '18px', flexShrink: 0 }}
                       >
-                        {favorites.includes(voice.name) ? (
+                        {favorites.includes(voiceKey) ? (
                           <StarFilled style={{ color: '#faad14' }} />
                         ) : (
                           <StarOutlined style={{ color: '#d9d9d9' }} />
@@ -361,7 +377,8 @@ function VoiceSelectionModal({ visible, onCancel, onSelect, modelId }) {
                     </div>
                   </div>
                 </Col>
-              ))}
+              );
+              })}
             </Row>
           </div>
         )}

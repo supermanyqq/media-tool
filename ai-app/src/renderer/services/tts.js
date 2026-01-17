@@ -7,7 +7,19 @@ export function getTTSModels() {
   return [
     {
       value: "qwen3-tts-flash",
-      label: "qwen3-TTS-Flash",
+      label: "Qwen3-TTS-Flash",
+      description: "49种音色，支持多语言",
+      maxChars: 600,
+    },
+    {
+      value: "cosyvoice-v3-flash",
+      label: "CosyVoice-V3-Flash（1元/万字符）",
+      description: "26种音色，支持中文",
+      maxChars: 600,
+    },
+    {
+      value: "cosyvoice-v2",
+      label: "CosyVoice-V2（2元/万字符）",
       description: "49种音色，支持多语言",
       maxChars: 600,
     },
@@ -50,13 +62,14 @@ export function getDefaultVoice(model) {
 /**
  * 调用TTS API合成语音
  */
-export async function synthesizeSpeech(text, model, voice) {
+export async function synthesizeSpeech(text, model, voice, params = {}) {
   try {
     const result = await window.electronAPI.synthesizeSpeech({
       text,
       model,
       voice,
       languageType: "Auto", // 自动检测语言
+      ...params, // 包含 volume 和 speed
     });
     return result;
   } catch (error) {
