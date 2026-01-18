@@ -15,6 +15,7 @@ import {
   Col,
   Slider,
   Modal,
+  Switch,
 } from "antd";
 import {
   SoundOutlined,
@@ -22,6 +23,7 @@ import {
   PlayCircleOutlined,
   SelectOutlined,
   SwapOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 import {
   getTTSModels,
@@ -538,19 +540,25 @@ function TTSPanel() {
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <Text strong>声音复刻</Text>
-                      <Button
-                        type={enableClone ? 'primary' : 'default'}
-                        size="small"
-                        onClick={() => setEnableClone(!enableClone)}
-                      >
-                        {enableClone ? '已开启' : '开启'}
-                      </Button>
+                      <Switch
+                        checked={enableClone}
+                        onChange={setEnableClone}
+                      />
                     </div>
                     {enableClone && (
                       <div style={{ marginTop: '12px' }}>
-                        <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginBottom: '8px' }}>
-                          已创建的音色
-                        </Text>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <Text type="secondary" style={{ fontSize: '12px' }}>
+                            已创建的音色
+                          </Text>
+                          <Button
+                            size="small"
+                            icon={<ReloadOutlined />}
+                            onClick={loadClonedVoices}
+                          >
+                            刷新
+                          </Button>
+                        </div>
                         
                         {clonedVoices.length > 0 ? (
                           <div style={{ marginBottom: '12px' }}>
