@@ -14,6 +14,7 @@ import {
   Row,
   Col,
   Slider,
+  Modal,
 } from "antd";
 import {
   SoundOutlined,
@@ -41,13 +42,42 @@ function TTSPanel() {
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
   const [volume, setVolume] = useState(50);
   const [speed, setSpeed] = useState(1);
+  const [enableClone, setEnableClone] = useState(false);
+  const [cloneAudioUrl, setCloneAudioUrl] = useState("");
+  const [cloneVoiceAlias, setCloneVoiceAlias] = useState("");
+  const [cloning, setCloning] = useState(false);
+  const [clonedVoices, setClonedVoices] = useState([]);
+  const [selectedClonedVoice, setSelectedClonedVoice] = useState(null);
 
   // 监听模型切换，重置音色选择
   useEffect(() => {
     setVoice(null);
     setAudioUrl("");
-    loadVoices()
+    loadVoices();
+    // 如果是cosyvoice模型，加载已复刻的音色
+    if (model.startsWith('cosyvoice')) {
+      loadClonedVoices();
+    }
   }, [model]);
+
+  // 监听复刻开关，启用时加载已有音色
+  useEffect(() => {
+    if (enableClone && model.startsWith('cosyvoice')) {
+      loadClonedVoices();
+    }
+  }, [enableClone]);
+
+  // 加载已复刻的音色列表
+  const loadClonedVoices = async () => {
+    try {
+      const result = await window.electronAPI.listClonedVoices();
+      if (result.success && result.voices) {
+        setClonedVoices(result.voices);
+      }
+    } catch (error) {
+      console.error('加载已复刻音色失败:', error);
+    }
+  };
 
    const loadVoices = async () => {
       setLoading(true);
@@ -72,6 +102,89 @@ function TTSPanel() {
     message.success(
       `已选择音色: ${selectedVoice.chineseName || selectedVoice.name}`
     );
+  };
+
+  const handleStartClone = async () => {
+    if (!cloneAudioUrl.trim()) {
+      message.warning('请先填写音频文件URL');
+      return;
+    }
+
+    // 如果用户填写了别名，验证格式
+    if (cloneVoiceAlias.trim() && !/^[a-z0-9_]{1,10}$/.test(cloneVoiceAlias.trim())) {
+      message.error('别名仅允许小写字母、数字和下划线，不超过10个字符');
+      return;
+    }
+
+    // URL 格式验证
+    try {
+      new URL(cloneAudioUrl);
+    } catch (e) {
+      message.error('请输入有效的URL地址');
+      return;
+    }
+
+    setCloning(true);
+    try {
+      const result = await window.electronAPI.createClonedVoice({
+        audioUrl: cloneAudioUrl,
+        targetModel: model,
+        prefix: cloneVoiceAlias.trim() || null,
+      });
+
+      if (result.success) {
+        message.success('声音复刻请求已提交！正在处理中，请稍后查看状态...');
+        setCloneAudioUrl("");
+        setCloneVoiceAlias("");
+        // 重新加载音色列表
+        await loadClonedVoices();
+        // 自动选择新复刻的音色
+        if (result.voiceId) {
+          const newVoice = {
+            voice: result.voiceId,
+            name: result.voiceId,
+            chineseName: result.voiceId,
+          };
+          setSelectedClonedVoice(result.voiceId);
+          setVoice(newVoice);
+        }
+      } else {
+        message.error('声音复刻失败: ' + (result.error || '未知错误'));
+      }
+    } catch (error) {
+      message.error('声音复刻失败: ' + (error.message || '未知错误'));
+    } finally {
+      setCloning(false);
+    }
+  };
+  
+  const handleDeleteVoice = async (voiceId) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除这个音色吗？此操作不可恢复。',
+      okText: '确认删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const result = await window.electronAPI.deleteClonedVoice(voiceId);
+          if (result.success) {
+            message.success('删除成功');
+            // 重新加载音色列表
+            await loadClonedVoices();
+            // 如果删除的是当前选中的音色，清空选择
+            if (selectedClonedVoice === voiceId) {
+              setSelectedClonedVoice(null);
+              setVoice(null);
+            }
+          } else {
+            message.error('删除失败: ' + (result.error || '未知错误'));
+          }
+        } catch (error) {
+          message.error('删除失败: ' + (error.message || '未知错误'));
+        }
+      },
+    });
   };
   
   const handleModelChange = (newModel) => {
@@ -155,6 +268,53 @@ function TTSPanel() {
                 输入文字，转换成逼真的语音，赋能场景丰富的实时应用
               </Text>
             </div>
+            
+            {/* 声音复刻URL输入区域 */}
+            {enableClone && model.startsWith('cosyvoice') && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{
+                  border: '1px dashed #d9d9d9',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  background: '#fafafa',
+                }}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginBottom: '8px' }}>
+                      音色别名（可选，仅支持小写字母、数字和下划线，不超过10个字符）
+                    </Text>
+                    <Input
+                      placeholder="例如: myvoice01（留空则自动生成）"
+                      value={cloneVoiceAlias}
+                      onChange={(e) => setCloneVoiceAlias(e.target.value.toLowerCase())}
+                      maxLength={10}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Input
+                      placeholder="请输入公网可访问的音频文件URL"
+                      value={cloneAudioUrl}
+                      onChange={(e) => setCloneAudioUrl(e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                    <Button
+                      type="primary"
+                      disabled={!cloneAudioUrl.trim()}
+                      loading={cloning}
+                      onClick={handleStartClone}
+                    >
+                      {cloning ? '复刻中...' : '开始复刻'}
+                    </Button>
+                  </div>
+                  <div style={{ marginTop: '8px' }}>
+                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                      wav/mp3/m4a，单/双声道，16kHz及以上，10s以上，小于10MB
+                    </Text>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <TextArea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -373,22 +533,102 @@ function TTSPanel() {
                       }}
                     />
                   </div>
+
+                  {/* 声音复刻开关 */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <Text strong>声音复刻</Text>
+                      <Button
+                        type={enableClone ? 'primary' : 'default'}
+                        size="small"
+                        onClick={() => setEnableClone(!enableClone)}
+                      >
+                        {enableClone ? '已开启' : '开启'}
+                      </Button>
+                    </div>
+                    {enableClone && (
+                      <div style={{ marginTop: '12px' }}>
+                        <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginBottom: '8px' }}>
+                          已创建的音色
+                        </Text>
+                        
+                        {clonedVoices.length > 0 ? (
+                          <div style={{ marginBottom: '12px' }}>
+                            {clonedVoices.map((voice) => {
+                              const statusText = voice.status === 'DEPLOYING' ? '审核中' : 
+                                                voice.status === 'UNDEPLOYED' ? '不可用' : '可用';
+                              const statusColor = voice.status === 'DEPLOYING' ? '#faad14' : 
+                                                 voice.status === 'UNDEPLOYED' ? '#ff4d4f' : '#52c41a';
+                              const isDisabled = voice.status !== 'OK';
+                              
+                              return (
+                                <div
+                                  key={voice.voice_id}
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    padding: '8px 12px',
+                                    marginBottom: '8px',
+                                    border: selectedClonedVoice === voice.voice_id ? '1px solid #1890ff' : '1px solid #f0f0f0',
+                                    borderRadius: '4px',
+                                    background: isDisabled ? '#f5f5f5' : (selectedClonedVoice === voice.voice_id ? '#e6f7ff' : '#fafafa'),
+                                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.3s',
+                                    opacity: isDisabled ? 0.6 : 1,
+                                  }}
+                                  onClick={() => {
+                                    if (!isDisabled) {
+                                      setSelectedClonedVoice(voice.voice_id);
+                                      setVoice({
+                                        voice: voice.voice_id,
+                                        name: voice.voice_id,
+                                        chineseName: voice.voice_id,
+                                      });
+                                      message.success(`已选择复刻音色: ${voice.voice_id}`);
+                                    }
+                                  }}
+                                >
+                                  <div style={{ flex: 1, overflow: 'hidden' }}>
+                                    <Text
+                                      style={{
+                                        display: 'block',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        color: selectedClonedVoice === voice.voice_id ? '#1890ff' : 'inherit',
+                                      }}
+                                    >
+                                      {voice.voice_id}
+                                    </Text>
+                                    <Tag color={statusColor} style={{ marginTop: '4px', fontSize: '10px' }}>
+                                      {statusText}
+                                    </Tag>
+                                  </div>
+                                  <Button
+                                    danger
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteVoice(voice.voice_id);
+                                    }}
+                                  >
+                                    删除
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginTop: '8px' }}>
+                            暂无已创建的音色，请上传音频开始复刻
+                          </Text>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
-
-              {/* 查看模型更多控制能力 */}
-              <div style={{ marginTop: "16px" }}>
-                <a
-                  href="#"
-                  style={{ color: "#1890ff", fontSize: "13px" }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    message.info("更多控制选项开发中...");
-                  }}
-                >
-                  查看模型 ssml 的更强控制能力
-                </a>
-              </div>
             </Space>
           </Card>
         </Col>

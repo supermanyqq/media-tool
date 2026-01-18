@@ -7,7 +7,7 @@ export function getTTSModels() {
   return [
     {
       value: "qwen3-tts-flash",
-      label: "Qwen3-TTS-Flash",
+      label: "Qwen3-TTS-Flash（0.8元/万字符）",
       description: "49种音色，支持多语言",
       maxChars: 600,
     },

@@ -422,6 +422,262 @@ ipcMain.handle("query-voice-list", async (event, modelId) => {
   };
 });
 
+// 创建声音复刻
+ipcMain.handle("create-cloned-voice", async (event, args) => {
+  const { audioUrl, targetModel, prefix } = args;
+
+  console.log("=== 创建声音复刻 ===");
+  console.log("目标模型:", targetModel);
+  console.log("音频URL:", audioUrl);
+  console.log("音色别名:", prefix);
+
+  try {
+    // 获取 API Key
+    const configPath = getConfigPath();
+    let apiKey = "";
+
+    if (fs.existsSync(configPath)) {
+      const configData = fs.readFileSync(configPath, "utf-8");
+      const config = JSON.parse(configData);
+      apiKey = config.apiKey;
+    }
+
+    if (!apiKey) {
+      return {
+        success: false,
+        error: "请先配置 API Key",
+      };
+    }
+    
+    // 如果没有提供prefix或为空，自动生成一个
+    let finalPrefix = prefix;
+    if (!finalPrefix) {
+      finalPrefix = 'v' + Date.now().toString().slice(-8);
+    } else {
+      // 验证用户提供的prefix格式
+      if (!/^[a-z0-9_]{1,10}$/.test(finalPrefix)) {
+        return {
+          success: false,
+          error: "音色别名格式不正确，仅允许小写字母、数字和下划线，不超过10个字符",
+        };
+      }
+    }
+
+    console.log("请求参数:", {
+      targetModel: targetModel,
+      prefix: finalPrefix,
+      url: audioUrl
+    });
+
+    // 根据官方curl示例的正确格式
+    const requestBody = {
+      model: "voice-enrollment",
+      input: {
+        action: "create_voice",
+        target_model: targetModel,
+        prefix: finalPrefix,
+        url: audioUrl,
+        language_hints: ["zh"],
+      },
+    };
+
+    console.log("完整请求体:", JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(
+      "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.log("错误响应:", errorData);
+      return {
+        success: false,
+        error: errorData.message || `HTTP ${response.status}: ${response.statusText}`,
+      };
+    }
+
+    const data = await response.json();
+    console.log("成功响应:", data);
+
+    // 音色创建是异步操作，立即返回voice_id
+    // 实际的音色状态可能是DEPLOYING（审核中），需要后续轮询查询状态
+    if (data.output && data.output.voice_id) {
+      return {
+        success: true,
+        voiceId: data.output.voice_id,
+        message: "音色创建请求已提交，正在处理中...",
+      };
+    } else {
+      return {
+        success: false,
+        error: "响应格式异常，未获取到音色ID",
+      };
+    }
+  } catch (error) {
+    console.error("创建声音复刻失败:", error);
+    return {
+      success: false,
+      error: error.message || "网络请求失败",
+    };
+  }
+});
+
+// 查询已创建的声音列表
+ipcMain.handle("list-cloned-voices", async (event) => {
+  try {
+    // 获取 API Key
+    const configPath = getConfigPath();
+    let apiKey = "";
+
+    if (fs.existsSync(configPath)) {
+      const configData = fs.readFileSync(configPath, "utf-8");
+      const config = JSON.parse(configData);
+      apiKey = config.apiKey;
+    }
+
+    if (!apiKey) {
+      return {
+        success: false,
+        error: "请先配置 API Key",
+      };
+    }
+
+    // 根据官方curl示例查询音色列表
+    console.log("=== 查询声音列表 ===");
+    const requestBody = {
+      model: "voice-enrollment",
+      input: {
+        action: "list_voice",  // 注意是单数
+        page_index: 0,
+        page_size: 100,
+      },
+    };
+
+    console.log("查询请求体:", JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(
+      "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.log("查询错误:", errorData);
+      return {
+        success: false,
+        error: errorData.message || `HTTP ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    console.log("查询成功:", data);
+
+    // 注意：响应中的字段是 voice_list 不是 voices
+    if (data.output && data.output.voice_list) {
+      return {
+        success: true,
+        voices: data.output.voice_list,
+      };
+    } else {
+      return {
+        success: true,
+        voices: [],
+      };
+    }
+  } catch (error) {
+    console.error("查询声音列表失败:", error);
+    return {
+      success: false,
+      error: error.message || "网络请求失败",
+    };
+  }
+});
+
+// 删除声音复刻
+ipcMain.handle("delete-cloned-voice", async (event, voiceId) => {
+  console.log("=== 删除声音复刻 ===");
+  console.log("音色ID:", voiceId);
+
+  try {
+    // 获取 API Key
+    const configPath = getConfigPath();
+    let apiKey = "";
+
+    if (fs.existsSync(configPath)) {
+      const configData = fs.readFileSync(configPath, "utf-8");
+      const config = JSON.parse(configData);
+      apiKey = config.apiKey;
+    }
+
+    if (!apiKey) {
+      return {
+        success: false,
+        error: "请先配置 API Key",
+      };
+    }
+
+    // 根据官方curl示例的删除请求格式
+    const requestBody = {
+      model: "voice-enrollment",
+      input: {
+        action: "delete_voice",
+        voice_id: voiceId,
+      },
+    };
+
+    console.log("删除请求体:", JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(
+      "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.log("删除错误:", errorData);
+      return {
+        success: false,
+        error: errorData.message || `HTTP ${response.status}: ${response.statusText}`,
+      };
+    }
+
+    const data = await response.json();
+    console.log("删除成功:", data);
+
+    return {
+      success: true,
+    };
+  } catch (error) {
+    console.error("删除声音复刻失败:", error);
+    return {
+      success: false,
+      error: error.message || "删除失败",
+    };
+  }
+});
+
 app.whenReady().then(() => {
   createWindow();
 });
