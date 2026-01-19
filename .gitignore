@@ -4,3 +4,4 @@ dist-electron/
 .DS_Store
 .vscode/
 src/main/vendor/whisper/
+release/
