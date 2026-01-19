@@ -11,29 +11,9 @@
     "preview": "vite preview",
     "start": "npm run dev:electron",
     "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:5174 && electron .\"",
-    "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder"
-  },
-  "build": {
-    "appId": "com.ai.app",
-    "productName": "AI语音助手",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "src/main/**/*",
-      "package.json"
-    ],
-    "win": {
-      "target": ["nsis"],
-      "icon": "build/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    },
-    "asar": true
+    "package": "npm run build && electron-builder",
+    "package:mac": "npm run build && electron-builder --mac",
+    "package:win": "npm run build && electron-builder --win"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
@@ -49,9 +29,36 @@
     "@vitejs/plugin-react": "^4.0.0",
     "concurrently": "^8.0.0",
     "electron": "^26.0.0",
-    "electron-builder": "^24.0.0",
+    "electron-builder": "^24.13.3",
     "less": "^4.5.1",
     "vite": "^5.0.0",
     "wait-on": "^7.0.0"
+  },
+  "build": {
+    "appId": "com.ai-app.app",
+    "productName": "AI App",
+    "files": [
+      "dist/**/*",
+      "src/main/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "build/icon.ico"
+    }
   }
 }

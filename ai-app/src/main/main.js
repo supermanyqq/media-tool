@@ -3,7 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const WebSocket = require("ws");
 const { v4: uuidv4 } = require("uuid");
-const { qwen3_tts_flash_voices } = require("./audioLIst");
+const { qwen3_tts_flash_voices } = require("./audioList");
 const {
   cosy_voice_v3_flash_voices,
   cosy_voice_v2_voices,
@@ -33,7 +33,7 @@ function createWindow() {
     win.loadURL(process.env.VITE_DEV_SERVER_URL || "http://localhost:5174");
     win.webContents.openDevTools({ mode: "detach" });
   } else {
-    win.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
+    win.loadFile(path.join(__dirname, "..", "..", "dist", "renderer", "index.html"));
   }
 }
 
